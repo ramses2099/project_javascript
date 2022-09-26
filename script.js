@@ -45,8 +45,16 @@ class Ball{
             this.dx = -this.dx;
         }
         //box right
-        if(this.y + this.dy > canvas.height -this.radius || this.y + this.dy < this.radius){
+        if(this.y + this.dy < this.radius){
             this.dy = -this.dy;
+        }else if(this.y + this.dy > canvas.height - this.radius){
+            if(this.x > paddle.x && paddle.x + paddle.width){
+                this.dy = -this.dy;
+            }else{
+               // alert('GAME OVER');
+                //document.location.reload();
+                //clearInterval(setInterval(draw, 10));
+            }
         }
 
         this.x += this.dx;
@@ -100,6 +108,35 @@ class Paddle{
     }
 }
 
+class Box{
+    constructor(setting){
+        this.x = setting.x;
+        this.y = setting.y;
+        this.w = setting.w;
+        this.h = setting.h;
+        this.dx = setting.dx;
+        this.dy = setting.dy;
+        this.isColliding = setting.isColliding || false;
+    }
+    //
+    getBounding(){
+        return { x: this.x, y: this.y, w: this.w, h: this.h };
+    }
+    //
+    draw(ctx){
+        ctx.beginPath();
+        ctx.fillStyle = this.isColliding? '#ff8080' : '#0099b0';
+        ctx.fillRect(this.x, this.y, this.h, this.h);
+        ctx.closePath();
+    }
+    //
+    update(dt){
+        console.log('delta time: ', dt)
+        this.x += this.dx * dt;
+        this.y += this.dy * dt;
+    }
+
+}
 
 //*-------------------------------------------------------------------------------------*//
 //*----------------------------------OBJECT DEFINITION----------------------------------*//
@@ -108,6 +145,11 @@ class Paddle{
 let ball = null;
 let paddle = null;
 
+let boxes = new Array();
+
+boxes.push(new Box({x: 5, y: 5, w: 50, h: 50, dx: 50, dy: 60}));
+boxes.push(new Box({x: 510, y: 205, w: 50, h: 50, dx: 60, dy: 75}));
+boxes.push(new Box({x: 60, y: 500, w: 50, h: 50, dx: 70, dy: 70}));
 
 //*-------------------------------------------------------------------------------------*//
 //*----------------------------------EVENT LISTENER-------------------------------------*//
@@ -131,7 +173,6 @@ window.addEventListener('keyup',(e)=>{
 },false);
 
 
-
 //*-------------------------------------------------------------------------------------*//
 //*----------------------------------GAME LOOP------------------------------------------*//
 //*-------------------------------------------------------------------------------------*//
@@ -146,13 +187,19 @@ function setInitState(){
 }
 
 //update game logic
-function update(tFrame){
-    ball.update(tFrame);
+function update(dt){
+    ball.update(dt);
     //
-    paddle.update(tFrame);
+    paddle.update(dt);
+
+    //boxes update
+    boxes.forEach((box)=>{
+        box.update(dt);
+    });
+
 }
 //draw game object
-function draw(tFrame){
+function draw(dt){
     //clear canva
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -161,46 +208,36 @@ function draw(tFrame){
 
     //draw paddle
     paddle.draw(ctx);
+
+    //boxes
+    boxes.forEach((box)=>{
+        box.draw(ctx);
+    });
 }
 
-let stopMain = null;
-let lastTick = 0;
-let lastRender = 0;
-let tickLength = 0;
+let now = 0;
+let dt = 0; //delta time
+let last = window.performance.now();
+let step = 1/60;
 
 //Immediately-Invoked Function Expression (IIFE)
 ;(()=>{
-    function main(tFrame){
-        stopMain = window.requestAnimationFrame(main);
-        const nextTick = lastTick + tickLength;
-        let numTicks = 0; 
-
-        if(tFrame > nextTick){
-            const timeSinceTick = tFrame - lastTick;
-            numTicks = Math.floor(timeSinceTick / tickLength);
+    function main(){
+        now = window.performance.now();
+        dt = dt + Math.min(1, (now - last ) / 1000);
+        while(dt > step){
+            dt = dt - step
+            //update
+            update(dt)
         }
-        //update
-        queueUpdate(numTicks);
         //draw
-        draw(numTicks);
-
-        lastRender = tFrame; 
-
+        draw(dt);
+        last = now;
+        window.requestAnimationFrame(main);
     }
-    // queueUpdate
-    function queueUpdate(numTicks){
-        for (let i = 0; i < numTicks; i++) {
-            lastTick += tickLength;
-            update(lastTick);            
-        }
-    }
-
-    lastTick = window.performance.now();
-    lastRender = lastTick;
-    tickLength = 60;
-
+   
     //setInitState
     setInitState();
 
-    main(window.performance.now()); //Start the cycle
+    main(); //Start the cycle
 })();
